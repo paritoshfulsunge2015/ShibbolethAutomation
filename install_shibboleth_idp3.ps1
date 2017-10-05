@@ -1,4 +1,4 @@
-﻿$domain = $args[0]
+$domain = $args[0]
 $location = $args[1]
 
 # Utility methods
@@ -36,8 +36,8 @@ echo $SITENAME
 New-Item c:\Temp -type directory
 
 # Download and install JDK and Tomcat
-echo "Downloading jdk7..."
-$source = "http://download.oracle.com/otn-pub/java/jdk/8u71-b15/jdk-8u71-windows-x64.exe"
+echo "Downloading jdk8..."
+$source = "http://download.oracle.com/otn-pub/java/jdk/8u144-b01/090f390dda5b47b9b721c7dfaa008135/jdk-8u144-windows-x64.exe"
 $destination = "C:\Temp\jdk-8u71-windows-x64.exe"
 $client = new-object System.Net.WebClient 
 $cookie = "oraclelicense=accept-securebackup-cookie"
@@ -45,12 +45,12 @@ $client.Headers.Add([System.Net.HttpRequestHeader]::Cookie, $cookie)
 $client.DownloadFile($source,$destination)
 
 echo "Downloading tomcat7..."
-$source = "http://www.eu.apache.org/dist/tomcat/tomcat-7/v7.0.67/bin/apache-tomcat-7.0.67-windows-x64.zip"
+$source = "http://www-eu.apache.org/dist/tomcat/tomcat-7/v7.0.82/bin/apache-tomcat-7.0.82-windows-x64.zip"
 $destination = "C:\Temp\apache-tomcat-7.0.67-windows-x64.zip"
 $client = new-object System.Net.WebClient 
 $client.DownloadFile($source,$destination)
 
-echo "Installing jdk7..."
+echo "Installing jdk8..."
 $proc1 = Start-Process -FilePath "C:\Temp\jdk-8u71-windows-x64.exe" -ArgumentList "/s REBOOT=ReallySuppress" -Wait -PassThru
 $proc1.waitForExit()
 
