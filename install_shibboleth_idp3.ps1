@@ -38,29 +38,30 @@ New-Item c:\Temp -type directory
 # Download and install JDK and Tomcat
 echo "Downloading jdk8..."
 $source = "http://download.oracle.com/otn-pub/java/jdk/8u144-b01/090f390dda5b47b9b721c7dfaa008135/jdk-8u144-windows-x64.exe"
-$destination = "C:\Temp\jdk-8u71-windows-x64.exe"
+$destination = "C:\Temp\jdk-8u144-windows-x64.exe"
 $client = new-object System.Net.WebClient 
 $cookie = "oraclelicense=accept-securebackup-cookie"
 $client.Headers.Add([System.Net.HttpRequestHeader]::Cookie, $cookie) 
 $client.DownloadFile($source,$destination)
 
-echo "Downloading tomcat7..."
-$source = "http://www-eu.apache.org/dist/tomcat/tomcat-7/v7.0.82/bin/apache-tomcat-7.0.82-windows-x64.zip"
-$destination = "C:\Temp\apache-tomcat-7.0.67-windows-x64.zip"
-$client = new-object System.Net.WebClient 
-$client.DownloadFile($source,$destination)
-
 echo "Installing jdk8..."
-$proc1 = Start-Process -FilePath "C:\Temp\jdk-8u71-windows-x64.exe" -ArgumentList "/s REBOOT=ReallySuppress" -Wait -PassThru
+$proc1 = Start-Process -FilePath $destination -ArgumentList "/s REBOOT=ReallySuppress" -Wait -PassThru
 $proc1.waitForExit()
 
 echo "Setting environment veriable..."
-$JDK_PATH="1.8.0_71"
+$JDK_PATH="1.8.0_144"
 [System.Environment]::SetEnvironmentVariable("JAVA_HOME", "c:\Program Files\Java\jdk$JDK_PATH", "Machine")
 [System.Environment]::SetEnvironmentVariable("PATH", $Env:Path + ";c:\Program Files\Java\jdk$JDK_PATH\bin", "Machine")
 
+echo "Downloading tomcat7..."
+$source = "http://www-eu.apache.org/dist/tomcat/tomcat-7/v7.0.82/bin/apache-tomcat-7.0.82-windows-x64.zip"
+$destination = "C:\Temp\apache-tomcat-7.0.82-windows-x64.zip"
+$client = new-object System.Net.WebClient 
+$client.DownloadFile($source,$destination)
+
 echo "Unzip tomcat7"
-Unzip "C:\Temp\apache-tomcat-7.0.67-windows-x64.zip" "C:\"
+Unzip $destination "C:\"
+$unzip_location = "C:\apache-tomcat-7.0.82"
 
 # Set up SSL access
 echo "Generating certificate..."
@@ -68,8 +69,8 @@ $SSLKEYPASSWORD=GET-Password -length 12 -sourcedata $alphabet
 cd "C:\Program Files\Java\jdk$JDK_PATH\bin\"
 .\keytool.exe -genkey -alias tomcat -keyalg RSA -keystore c:\Temp\server.keystore -keysize 2048 -storepass $SSLKEYPASSWORD -keypass $SSLKEYPASSWORD -dname "cn=$SITENAME, ou=shibbolethOU, o=shibbolethO, c=US"
 
-$filedata = [IO.File]::ReadAllText("C:\apache-tomcat-7.0.67\conf\server.xml")
-Rename-Item C:\apache-tomcat-7.0.67\conf\server.xml C:\apache-tomcat-7.0.67\conf\server-old.xml
+$filedata = [IO.File]::ReadAllText("$unzip_location\conf\server.xml")
+Rename-Item $unzip_location\conf\server.xml $unzip_location\conf\server-old.xml
 $OriginalString='redirectPort="8443"'
 $ReplceString='redirectPort="8443" address="0.0.0.0"'
 $filedata=$filedata.Replace($OriginalString,$ReplceString)
@@ -77,11 +78,11 @@ $filedata=$filedata.Replace($OriginalString,$ReplceString)
 $OriginalString="<!-- Define an AJP 1.3 Connector on port 8009 -->"
 $ReplaceWith='<Connector port="8443" protocol="org.apache.coyote.http11.Http11Protocol" SSLEnabled="true" maxThreads="150" scheme="https" secure="true"  clientAuth="false" sslProtocol="TLS" address="0.0.0.0" keystoreFile="C:\Temp\server.keystore"' + " keystorePass='$SSLKEYPASSWORD'/>"
 $filedata=$filedata.Replace($OriginalString,$ReplaceWith)
-[IO.File]::WriteAllText("C:\apache-tomcat-7.0.67\conf\server.xml", $filedata.TrimEnd())
+[IO.File]::WriteAllText("$unzip_location\conf\server.xml", $filedata.TrimEnd())
 
 echo "Downloading JSTL..."
 $source = "http://central.maven.org/maven2/jstl/jstl/1.2/jstl-1.2.jar"
-$destination = "C:\apache-tomcat-7.0.67\lib\jstl-1.2.jar"
+$destination = "$unzip_location\lib\jstl-1.2.jar"
 $client = new-object System.Net.WebClient 
 $client.DownloadFile($source,$destination)
 
@@ -93,7 +94,7 @@ $client = new-object System.Net.WebClient
 $client.DownloadFile($source,$destination)
 
 echo "Unzip shibboleth"
-Unzip "C:\Temp\shibboleth-identity-provider-3.2.0.zip" "C:\"
+Unzip $destination "C:\"
 
 echo "Generate preconfig file"
 $newLine= [System.Environment]::NewLine
@@ -119,7 +120,7 @@ echo "Running the shibboleth installer..."
 $filedata = [IO.File]::ReadAllText("C:\shibboleth-identity-provider-3.2.0\bin\install.bat")
 Rename-Item C:\shibboleth-identity-provider-3.2.0\bin\install.bat C:\shibboleth-identity-provider-3.2.0\bin\install-old.bat
 $OriginalString="setlocal"
-$ReplceString="setlocal`r`nset JAVA_HOME=C:\Program Files\Java\jdk1.8.0_71"
+$ReplceString="setlocal`r`nset JAVA_HOME=C:\Program Files\Java\jdk$JDK_PATH"
 $filedata=$filedata.Replace($OriginalString,$ReplceString)
 [IO.File]::WriteAllText("C:\shibboleth-identity-provider-3.2.0\bin\install.bat", $filedata.TrimEnd())
 
@@ -147,9 +148,9 @@ $content=$content.Replace($OriginalString,$ReplceString)
 [IO.File]::WriteAllText("C:\opt\shibboleth-idp\metadata\idp-metadata.xml", $content.TrimEnd())
 
 echo "Adding application to tomcat7..."
-New-Item C:\apache-tomcat-7.0.67\conf\Catalina\localhost -type directory
+New-Item $unzip_location\conf\Catalina\localhost -type directory
 $appData='<Context docBase="C:\opt\shibboleth-idp\war\idp.war" privileged="true" antiresourcelocking="false" antijarlocking="false" unpackwar="false" swallowoutput="true" />'
-[IO.File]::WriteAllText("C:\apache-tomcat-7.0.67\conf\Catalina\localhost\idp.xml", $appData.TrimEnd())
+[IO.File]::WriteAllText("$unzip_location\conf\Catalina\localhost\idp.xml", $appData.TrimEnd())
 
 echo "allow access to public"
 $content = [IO.File]::ReadAllText("C:\opt\shibboleth-idp\conf\access-control.xml")
@@ -163,19 +164,19 @@ cmd.exe /c "netsh advfirewall firewall add rule name="Allow TCP 80,8080,8443" di
 
 # Restart Tomcat
 echo "restart tomcat"
-$filedata = [IO.File]::ReadAllText("C:\apache-tomcat-7.0.67\bin\startup.bat")
-Rename-Item C:\apache-tomcat-7.0.67\bin\startup.bat C:\apache-tomcat-7.0.67\bin\startup-old.bat
+$filedata = [IO.File]::ReadAllText("$unzip_location\bin\startup.bat")
+Rename-Item $unzip_location\bin\startup.bat $unzip_location\bin\startup-old.bat
 $OriginalString="setlocal"
-$ReplceString="setlocal`r`nset JAVA_HOME=C:\Program Files\Java\jdk1.8.0_71"
+$ReplceString="setlocal`r`nset JAVA_HOME=C:\Program Files\Java\jdk$JDK_PATH"
 $filedata=$filedata.Replace($OriginalString,$ReplceString)
-[IO.File]::WriteAllText("C:\apache-tomcat-7.0.67\bin\startup.bat", $filedata.TrimEnd())
+[IO.File]::WriteAllText("$unzip_location\bin\startup.bat", $filedata.TrimEnd())
 
-$filedata = [IO.File]::ReadAllText("C:\apache-tomcat-7.0.67\bin\shutdown.bat")
-Rename-Item C:\apache-tomcat-7.0.67\bin\shutdown.bat C:\apache-tomcat-7.0.67\bin\shutdown-old.bat
+$filedata = [IO.File]::ReadAllText("$unzip_location\bin\shutdown.bat")
+Rename-Item $unzip_location\bin\shutdown.bat $unzip_location\bin\shutdown-old.bat
 $OriginalString="setlocal"
-$ReplceString="setlocal`r`nset JAVA_HOME=C:\Program Files\Java\jdk1.8.0_71"
+$ReplceString="setlocal`r`nset JAVA_HOME=C:\Program Files\Java\jdk$JDK_PATH"
 $filedata=$filedata.Replace($OriginalString,$ReplceString)
-[IO.File]::WriteAllText("C:\apache-tomcat-7.0.67\bin\shutdown.bat", $filedata.TrimEnd())
+[IO.File]::WriteAllText("$unzip_location\bin\shutdown.bat", $filedata.TrimEnd())
 
-cd C:\apache-tomcat-7.0.67\bin\
+cd $unzip_location\bin\
 Start-Process .\startup.bat
